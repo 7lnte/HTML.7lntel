@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แดชบอร์ดบันทึกเวรวันพุธ</title>
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); padding: 30px; }
+        h2 { text-align: center; color: #667eea; margin-bottom: 20px; }
+        .form-group { margin-bottom: 18px; }
+        label { font-weight: 600; margin-bottom: 8px; display: block; }
+        input, select { width: 100%; padding: 10px; border-radius: 8px; border: 1.5px solid #e0e0e0; font-size: 16px; }
+        .btn { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 12px 30px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .btn:hover { box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); }
+        .history { margin-top: 30px; }
+        .record-card { background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+        .record-status { font-weight: bold; color: #764ba2; }
+        .record-trash { color: #28a745; font-weight: bold; }
+        .logout { float: right; background: #dc3545; }
+    </style>
+    <script src="script.js"></script>
+</head>
+<body>
+                <div class="container">
+                    <button class="btn logout" onclick="logout()">ออกจากระบบ</button>
+                    <h2>บันทึกเวรวันพุธ</h2>
+                    <div id="adminFormContainer"></div>
+                    <div class="history">
+                        <h3>ประวัติเวรวันพุธ</h3>
+                        <div id="dutyHistory"></div>
+                    </div>
+                </div>
+    <script>
+        // ตรวจสอบล็อกอิน
+        const user = JSON.parse(localStorage.getItem('dutyUser'));
+        if (!user) window.location.href = 'index.html';
+        // สร้างฟอร์มบันทึกเวรเฉพาะแอดมิน
+        function renderAdminForm() {
+            if (user.role !== 'admin') return;
+            document.getElementById('adminFormContainer').innerHTML = `
+            <form id="dutyForm">
+                <div class="form-group">
+                    <label for="dutyDate">วันที่เวร (วันพุธ):</label>
+                    <input type="date" id="dutyDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="dutyMember">ชื่อผู้รับผิดชอบ (เลือกได้หลายคน):</label>
+                    <select id="dutyMember" multiple required style="height:120px;">
+                        <option value="วุฒิ">วุฒิ</option>
+                        <option value="โชกุล">โชกุล</option>
+                        <option value="มาร์ค">มาร์ค</option>
+                        <option value="โตโน่">โตโน่</option>
+                        <option value="ด้วน">ด้วน</option>
+                        <option value="เพชร">เพชร</option>
+                        <option value="ออม">ออม</option>
+                        <option value="ฟ้าใส">ฟ้าใส</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="dutyStatus">สถานะ:</label>
+                    <select id="dutyStatus" required>
+                        <option value="มา">มา</option>
+                        <option value="สาย">สาย</option>
+                        <option value="ขาด">ขาด</option>
+                        <option value="ลา">ลา</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="trash1">เวรทิ้งขยะ (ชื่อคนที่ 1):</label>
+                    <input type="text" id="trash1" placeholder="ชื่อคนที่ 1" required>
+                </div>
+                <div class="form-group">
+                    <label for="trash2">เวรทิ้งขยะ (ชื่อคนที่ 2):</label>
+                    <input type="text" id="trash2" placeholder="ชื่อคนที่ 2" required>
+                </div>
+                <button class="btn" type="submit">บันทึกเวร</button>
+            </form>
+            `;
+            // ตั้งค่าวันพุธถัดไป
+            function setNextWednesday() {
+                const today = new Date();
+                const dayOfWeek = today.getDay();
+                const daysUntilWednesday = (3 - dayOfWeek + 7) % 7;
+                const nextWednesday = new Date(today);
+                nextWednesday.setDate(today.getDate() + daysUntilWednesday);
+                document.getElementById('dutyDate').value = nextWednesday.toISOString().split('T')[0];
+            }
+            setNextWednesday();
+            document.getElementById('dutyForm').onsubmit = function(e) {
+                e.preventDefault();
+                const date = document.getElementById('dutyDate').value;
+                const memberSelect = document.getElementById('dutyMember');
+                const members = Array.from(memberSelect.selectedOptions).map(opt => opt.value);
+                const status = document.getElementById('dutyStatus').value;
+                const trash1 = document.getElementById('trash1').value.trim();
+                const trash2 = document.getElementById('trash2').value.trim();
+                if (!date || members.length === 0 || !status || !trash1 || !trash2) {
+                    alert('กรุณากรอกข้อมูลให้ครบ');
+                    return;
+                }
+                if (new Date(date).getDay() !== 3) {
+                    alert('เลือกได้เฉพาะวันพุธเท่านั้น');
+                    return;
+                }
+                saveDutyFull(members, date, status, [trash1, trash2]);
+                showHistory();
+                setNextWednesday();
+                document.getElementById('dutyForm').reset();
+            };
+        }
+        renderAdminForm();
+        // แสดงประวัติ
+        function showHistory() {
+            const duties = JSON.parse(localStorage.getItem('duties')) || [];
+            let html = '';
+            // แอดมินเห็นทุกคน สมาชิกเห็นเฉพาะตัวเอง
+            duties.filter(d => user.role === 'admin' ? true : d.user === user.name).reverse().forEach(d => {
+                html += `<div class='record-card'>
+                    <div>วันที่: ${d.date}</div>
+                    <div>ชื่อ: <b>${d.user}</b></div>
+                    <div>สถานะ: <span class='record-status'>${d.status}</span></div>
+                    <div>เวรทิ้งขยะ: <span class='record-trash'>${d.trash.join(' , ')}</span></div>
+                </div>`;
+            });
+            document.getElementById('dutyHistory').innerHTML = html || '<div>ยังไม่มีข้อมูลเวร</div>';
+        }
+        showHistory();
+        // ฟังก์ชันบันทึกเวรแบบใหม่
+        function saveDutyFull(name, date, status, trashArr) {
+            const duties = JSON.parse(localStorage.getItem('duties')) || [];
+            // รองรับหลายชื่อ
+            name.forEach(n => {
+                duties.push({ user: n, date, status, trash: trashArr });
+            });
+            localStorage.setItem('duties', JSON.stringify(duties));
+        }
+        // ฟังก์ชันออกจากระบบ
+        function logout() {
+            localStorage.removeItem('dutyUser');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
